@@ -55,13 +55,15 @@ Parámetros:
 
 En `descripcion` puedes usar:
 - `{user}` o `@user` para mencionar al miembro que entra.
-- `\n` para separar el texto en varias líneas.
+- Shift+Enter para separar el texto en varias líneas.
 
 Ejemplo de descripción:
-`¡Hola {user}!\nLee #reglas y disfruta el servidor 🎉`
+`¡Hola {user}!`
+`Lee #reglas y disfruta el servidor 🎉`
 
 El bot guarda esta configuración por servidor y la reutiliza en cada nuevo miembro.
 Sin esta configuración, el bot no enviará bienvenida.
+Incluye protección anti-duplicados: si Discord dispara el evento más de una vez para el mismo usuario en pocos segundos, solo enviará un mensaje.
 
 ## 8) Autorrol al entrar (solo administradores)
 - `/configurar_autorrol rol:@MiRol` → asigna automáticamente ese rol a cada miembro que entre.

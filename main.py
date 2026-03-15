@@ -2,6 +2,7 @@ import os
 import sys
 import asyncio
 import json
+import time
 from pathlib import Path
 from typing import Any
 import discord
@@ -24,6 +25,8 @@ tree = app_commands.CommandTree(client)
 _synced = False
 CONFIG_FILE = Path(__file__).with_name("welcome_config.json")
 welcome_config: dict[str, dict[str, Any]] = {}
+recent_welcomes: dict[tuple[int, int], float] = {}
+WELCOME_DEDUP_SECONDS = 20
 
 
 def load_config() -> None:
@@ -91,10 +94,10 @@ async def send_welcome(member: discord.Member) -> bool:
     raw_description = embed_description or "{user} se acaba de unir al servidor."
     processed_description = (
         raw_description
-        .replace("\\n", "\n")
         .replace("{user}", member.mention)
         .replace("@user", member.mention)
     )
+    has_user_placeholder = "{user}" in raw_description or "@user" in raw_description
 
     embed = discord.Embed(
         title=embed_title or "¡Bienvenido/a!",
@@ -104,7 +107,23 @@ async def send_welcome(member: discord.Member) -> bool:
     if isinstance(embed_image_url, str) and embed_image_url.strip():
         embed.set_image(url=embed_image_url)
 
-    await channel.send(content=member.mention, embed=embed)
+    await channel.send(content=None if has_user_placeholder else member.mention, embed=embed)
+    return True
+
+
+def should_send_welcome(member: discord.Member) -> bool:
+    key = (member.guild.id, member.id)
+    now = time.monotonic()
+
+    stale_keys = [item_key for item_key, ts in recent_welcomes.items() if now - ts > WELCOME_DEDUP_SECONDS]
+    for stale_key in stale_keys:
+        recent_welcomes.pop(stale_key, None)
+
+    last_sent = recent_welcomes.get(key)
+    if last_sent is not None and now - last_sent < WELCOME_DEDUP_SECONDS:
+        return False
+
+    recent_welcomes[key] = now
     return True
 
 
@@ -154,6 +173,10 @@ async def on_ready():
 
 @client.event
 async def on_member_join(member: discord.Member):
+    if not should_send_welcome(member):
+        print(f"ℹ️ Bienvenida duplicada bloqueada para {member} en {member.guild.name}")
+        return
+
     await try_assign_autorole(member)
     await send_welcome(member)
 
@@ -188,7 +211,7 @@ async def configurar_bienvenida_embed(
     save_config()
 
     await interaction.response.send_message(
-        "✅ Embed configurado. Usa `{user}` o `@user` para mencionar al miembro, y `\\n` para saltos de línea. Prueba con `/simular_bienvenida`.",
+        "✅ Embed configurado. Usa `{user}` o `@user` para mencionar al miembro y escribe saltos de línea con Shift+Enter. Prueba con `/simular_bienvenida`.",
         ephemeral=True,
     )
 
