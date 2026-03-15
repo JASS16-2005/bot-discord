@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import timedelta
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
@@ -59,6 +60,40 @@ def should_send_command_message(interaction: discord.Interaction, canal: discord
     return True
 
 
+async def was_recent_welcome_sent(channel: discord.abc.Messageable, member: discord.Member) -> bool:
+    if not isinstance(channel, discord.TextChannel):
+        return False
+
+    now = discord.utils.utcnow()
+    async for msg in channel.history(limit=25):
+        if msg.author.id != client.user.id:
+            continue
+        if now - msg.created_at > timedelta(seconds=90):
+            break
+
+        if msg.embeds:
+            first_embed = msg.embeds[0]
+            same_title = first_embed.title == "🌟 ¡Bienvenido a Impact! 🌟"
+            mentions_user = member.mention in (first_embed.description or "")
+            if same_title and mentions_user:
+                return True
+
+    return False
+
+
+async def was_recent_command_message_sent(channel: discord.TextChannel, mensaje: str) -> bool:
+    now = discord.utils.utcnow()
+    async for msg in channel.history(limit=15):
+        if msg.author.id != client.user.id:
+            continue
+        if now - msg.created_at > timedelta(seconds=20):
+            break
+        if (msg.content or "").strip() == mensaje.strip():
+            return True
+
+    return False
+
+
 def get_welcome_channel(guild: discord.Guild) -> discord.abc.Messageable | None:
     me = guild.me
     if me is None:
@@ -85,6 +120,10 @@ async def send_welcome(member: discord.Member) -> bool:
     channel = get_welcome_channel(member.guild)
     if not channel:
         print(f"⚠️ No encontré canal para bienvenida en {member.guild.name}")
+        return False
+
+    if await was_recent_welcome_sent(channel, member):
+        print(f"ℹ️ Bienvenida ya enviada recientemente para {member} en {member.guild.name}")
         return False
 
     embed = discord.Embed(
@@ -183,6 +222,12 @@ async def mandar(interaction: discord.Interaction, canal: discord.TextChannel, m
     if not should_send_command_message(interaction, canal, mensaje):
         await interaction.response.send_message(
             "⚠️ Detecté un envío duplicado y lo bloqueé.", ephemeral=True
+        )
+        return
+
+    if await was_recent_command_message_sent(canal, mensaje):
+        await interaction.response.send_message(
+            "⚠️ Ese mensaje ya fue enviado hace unos segundos y lo bloqueé.", ephemeral=True
         )
         return
 
