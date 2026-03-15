@@ -1,5 +1,7 @@
 import os
 import time
+import random
+import asyncio
 from datetime import timedelta
 import discord
 from discord import app_commands
@@ -126,6 +128,11 @@ async def send_welcome(member: discord.Member) -> bool:
         print(f"ℹ️ Bienvenida ya enviada recientemente para {member} en {member.guild.name}")
         return False
 
+    await asyncio.sleep(random.uniform(0.6, 1.4))
+    if await was_recent_welcome_sent(channel, member):
+        print(f"ℹ️ Bienvenida duplicada bloqueada en segunda verificación para {member}")
+        return False
+
     embed = discord.Embed(
         title="🌟 ¡Bienvenido a Impact! 🌟",
         description=(
@@ -228,6 +235,13 @@ async def mandar(interaction: discord.Interaction, canal: discord.TextChannel, m
     if await was_recent_command_message_sent(canal, mensaje):
         await interaction.response.send_message(
             "⚠️ Ese mensaje ya fue enviado hace unos segundos y lo bloqueé.", ephemeral=True
+        )
+        return
+
+    await asyncio.sleep(random.uniform(0.4, 0.9))
+    if await was_recent_command_message_sent(canal, mensaje):
+        await interaction.response.send_message(
+            "⚠️ Detecté duplicado en segunda verificación y lo bloqueé.", ephemeral=True
         )
         return
 
