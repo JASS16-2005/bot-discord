@@ -88,9 +88,17 @@ async def send_welcome(member: discord.Member) -> bool:
     if not channel:
         print(f"⚠️ No encontré canal para bienvenida en {member.guild.name}")
         return False
+    raw_description = embed_description or "{user} se acaba de unir al servidor."
+    processed_description = (
+        raw_description
+        .replace("\\n", "\n")
+        .replace("{user}", member.mention)
+        .replace("@user", member.mention)
+    )
+
     embed = discord.Embed(
         title=embed_title or "¡Bienvenido/a!",
-        description=embed_description or f"{member.mention} se acaba de unir al servidor.",
+        description=processed_description,
         color=embed_color,
     )
     if isinstance(embed_image_url, str) and embed_image_url.strip():
@@ -180,7 +188,7 @@ async def configurar_bienvenida_embed(
     save_config()
 
     await interaction.response.send_message(
-        "✅ Embed de bienvenida configurado. Usa `/simular_bienvenida` para probarlo.",
+        "✅ Embed configurado. Usa `{user}` o `@user` para mencionar al miembro, y `\\n` para saltos de línea. Prueba con `/simular_bienvenida`.",
         ephemeral=True,
     )
 

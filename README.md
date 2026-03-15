@@ -53,6 +53,13 @@ Parámetros:
 - `imagen_url` (opcional): URL de imagen para mostrar en el mensaje.
 - `color_hex` (opcional): color HEX del embed (ejemplo `#5865F2`).
 
+En `descripcion` puedes usar:
+- `{user}` o `@user` para mencionar al miembro que entra.
+- `\n` para separar el texto en varias líneas.
+
+Ejemplo de descripción:
+`¡Hola {user}!\nLee #reglas y disfruta el servidor 🎉`
+
 El bot guarda esta configuración por servidor y la reutiliza en cada nuevo miembro.
 Sin esta configuración, el bot no enviará bienvenida.
 
