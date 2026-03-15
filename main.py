@@ -1,4 +1,5 @@
 import os
+import time
 import discord
 from discord import app_commands
 from dotenv import load_dotenv
@@ -19,6 +20,43 @@ intents.members = True
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 _synced = False
+recent_join_events: dict[tuple[int, int], float] = {}
+recent_command_sends: dict[tuple[int, int, int, str], float] = {}
+JOIN_DEDUP_SECONDS = 30
+COMMAND_DEDUP_SECONDS = 8
+
+
+def prune_old_entries(cache: dict, ttl_seconds: int) -> None:
+    now = time.monotonic()
+    stale_keys = [key for key, ts in cache.items() if now - ts > ttl_seconds]
+    for key in stale_keys:
+        cache.pop(key, None)
+
+
+def should_send_join_welcome(member: discord.Member) -> bool:
+    prune_old_entries(recent_join_events, JOIN_DEDUP_SECONDS)
+    key = (member.guild.id, member.id)
+    now = time.monotonic()
+    last_seen = recent_join_events.get(key)
+    if last_seen is not None and now - last_seen < JOIN_DEDUP_SECONDS:
+        return False
+
+    recent_join_events[key] = now
+    return True
+
+
+def should_send_command_message(interaction: discord.Interaction, canal: discord.TextChannel, mensaje: str) -> bool:
+    prune_old_entries(recent_command_sends, COMMAND_DEDUP_SECONDS)
+    author_id = interaction.user.id
+    guild_id = interaction.guild_id or 0
+    key = (guild_id, author_id, canal.id, mensaje.strip())
+    now = time.monotonic()
+    last_seen = recent_command_sends.get(key)
+    if last_seen is not None and now - last_seen < COMMAND_DEDUP_SECONDS:
+        return False
+
+    recent_command_sends[key] = now
+    return True
 
 
 def get_welcome_channel(guild: discord.Guild) -> discord.abc.Messageable | None:
@@ -120,6 +158,10 @@ async def on_ready():
 
 @client.event
 async def on_member_join(member: discord.Member):
+    if not should_send_join_welcome(member):
+        print(f"ℹ️ Bienvenida duplicada evitada para {member} en {member.guild.name}")
+        return
+
     await assign_autorole(member)
     await send_welcome(member)
 
@@ -135,6 +177,12 @@ async def mandar(interaction: discord.Interaction, canal: discord.TextChannel, m
     if not canal.permissions_for(interaction.guild.me).send_messages:
         await interaction.response.send_message(
             "⚠️ No tengo permiso para enviar mensajes en ese canal.", ephemeral=True
+        )
+        return
+
+    if not should_send_command_message(interaction, canal, mensaje):
+        await interaction.response.send_message(
+            "⚠️ Detecté un envío duplicado y lo bloqueé.", ephemeral=True
         )
         return
 
