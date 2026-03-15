@@ -45,6 +45,7 @@ El comando responde en privado y envía la bienvenida al canal configurado.
 Comando principal:
 
 - `/configurar_bienvenida_embed canal:#canal titulo:"..." descripcion:"..." imagen_url:"https://..." color_hex:#5865F2`
+- Alternativa recomendada para multilínea: `/configurar_bienvenida_modal canal:#canal imagen_url:"https://..." color_hex:#5865F2`
 
 Parámetros:
 - `canal`: canal donde se enviará la bienvenida.
@@ -56,6 +57,8 @@ Parámetros:
 En `descripcion` puedes usar:
 - `{user}` o `@user` para mencionar al miembro que entra.
 - Shift+Enter para separar el texto en varias líneas.
+
+Nota: si Discord no te deja hacer saltos de línea cómodamente en el comando normal, usa `configurar_bienvenida_modal`, que abre un cuadro de texto grande para escribir múltiples líneas.
 
 Ejemplo de descripción:
 `¡Hola {user}!`

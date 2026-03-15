@@ -62,6 +62,53 @@ def parse_hex_color(color_hex: str | None) -> int:
     return int(normalized, 16)
 
 
+class WelcomeEmbedModal(discord.ui.Modal, title="Configurar bienvenida embed"):
+    def __init__(
+        self,
+        guild_id: int,
+        canal_id: int,
+        imagen_url: str,
+        color_value: int,
+        default_title: str,
+        default_description: str,
+    ):
+        super().__init__()
+        self.guild_id = guild_id
+        self.canal_id = canal_id
+        self.imagen_url = imagen_url
+        self.color_value = color_value
+
+        self.titulo = discord.ui.TextInput(
+            label="Título",
+            default=default_title,
+            max_length=256,
+            required=True,
+        )
+        self.descripcion = discord.ui.TextInput(
+            label="Descripción (multilínea)",
+            style=discord.TextStyle.paragraph,
+            default=default_description,
+            max_length=2000,
+            required=True,
+        )
+        self.add_item(self.titulo)
+        self.add_item(self.descripcion)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        guild_settings = get_guild_config(self.guild_id)
+        guild_settings["welcome_channel_id"] = self.canal_id
+        guild_settings["embed_title"] = str(self.titulo.value)
+        guild_settings["embed_description"] = str(self.descripcion.value)
+        guild_settings["embed_image_url"] = self.imagen_url
+        guild_settings["embed_color"] = self.color_value
+        save_config()
+
+        await interaction.response.send_message(
+            "✅ Embed configurado desde modal. Puedes usar Enter para saltos de línea y `{user}` para mencionar.",
+            ephemeral=True,
+        )
+
+
 def get_welcome_channel(guild: discord.Guild) -> discord.abc.Messageable | None:
     me = guild.me
     if me is None:
@@ -214,6 +261,45 @@ async def configurar_bienvenida_embed(
         "✅ Embed configurado. Usa `{user}` o `@user` para mencionar al miembro y escribe saltos de línea con Shift+Enter. Prueba con `/simular_bienvenida`.",
         ephemeral=True,
     )
+
+
+@tree.command(
+    name="configurar_bienvenida_modal",
+    description="Configura bienvenida con cuadro de texto multilínea",
+)
+@app_commands.guild_only()
+@app_commands.default_permissions(manage_guild=True)
+async def configurar_bienvenida_modal(
+    interaction: discord.Interaction,
+    canal: discord.TextChannel,
+    imagen_url: str | None = None,
+    color_hex: str | None = None,
+):
+    if not is_guild_admin(interaction):
+        await interaction.response.send_message("⛔ Solo admins pueden usar este comando.", ephemeral=True)
+        return
+
+    guild_settings = get_guild_config(interaction.guild_id)
+    current_title = guild_settings.get("embed_title") or "¡Bienvenido/a!"
+    current_description = guild_settings.get("embed_description") or "{user} se acaba de unir al servidor."
+    current_image = guild_settings.get("embed_image_url") or ""
+    current_color = guild_settings.get("embed_color", discord.Color.blurple().value)
+
+    try:
+        color_value = parse_hex_color(color_hex) if color_hex else current_color
+    except ValueError as error:
+        await interaction.response.send_message(f"⚠️ {error}", ephemeral=True)
+        return
+
+    modal = WelcomeEmbedModal(
+        guild_id=interaction.guild_id,
+        canal_id=canal.id,
+        imagen_url=imagen_url.strip() if imagen_url is not None else current_image,
+        color_value=color_value,
+        default_title=current_title,
+        default_description=current_description,
+    )
+    await interaction.response.send_modal(modal)
 
 
 @tree.command(name="configurar_autorrol", description="Configura el rol automático al entrar")
